@@ -8,7 +8,7 @@ polymorph allows for changing configuration files and executing scripts at runti
 
 And since we're using a template engine, we can continue to use preexisting modules that take in string values instead of re-inventing the wheel for existing configuration files.
 
-## Enabling
+## Usage
 
 In `flake.nix`:
 
@@ -23,14 +23,14 @@ In `flake.nix`:
 In your home manager module:
 
 ```nix
-{ inputs, ... }:
+{ polymorph, ... }:
 
 {
-    imports = [ inputs.polymorph.homeManagerModules.default ];
+    imports = [ polymorph.homeManagerModules.default ];
 }
 ```
 
-## Usage
+### Basic
 
 polymorph divides up configuration sets into "morphs" that provide settings to the template engine (as well as any additional scripts needed to be executed).
 
@@ -81,4 +81,73 @@ Finally, we can activate these morphs as we please.
 polymorph.default = "dark"; # Will be applied during home activation.
 
 home.file."enableDarkMode".source = config.polymorph.activate.dark;
+```
+
+### Theme
+
+Included within the flake is a `theme` Home Manager module that is set-up to enable cursor and GTK theme switching using the morph system. Import the module:
+
+```nix
+{ polymorph, ... }:
+
+{
+    imports = [ polymorph.homeManagerModules.theme ];
+}
+```
+
+Then setup your themes.
+
+```nix
+polymorph = {
+    morph = {
+        dark.follows = "common";
+        light.follows = "common";
+    };
+
+    theme = {
+        common = {
+            font = {
+                name = "Ubuntu Nerd Font";
+                size = 11;
+            };
+
+            packages = with pkgs; [
+                colloid-gtk-theme
+                nerd-fonts.ubuntu
+                phinger-cursors
+                colloid-icon-theme
+            ];
+        };
+
+        dark = {
+            cursorTheme = {
+                name = "phinger-cursors-dark";
+                size = 24;
+            };
+
+            iconTheme.name = "Colloid-Dark";
+            theme.name = "Colloid-Dark-Catppuccin";
+        };
+
+        light = {
+            cursorTheme = {
+                name = "phinger-cursors-light";
+                size = 24;
+            };
+
+            iconTheme.name = "Colloid-Light";
+            theme.name = "Colloid-Light-Catppuccin";
+        };
+    };
+};
+```
+
+[darkman](https://gitlab.com/WhyNotHugo/darkman) support is included.
+
+```nix
+polymorph.darkman = {
+    enable = true;
+    dark = "dark"; # These are set as the default morphs to use
+    light = "light";
+};
 ```

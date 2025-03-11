@@ -1,3 +1,4 @@
+outputs:
 {
   config,
   lib,
@@ -19,8 +20,7 @@ let
     ;
   inherit (lib.asserts) assertMsg;
   inherit (lib.attrsets) filterAttrs mapAttrs;
-  inherit (lib.lists) any;
-  inherit (lib.strings) concatLines;
+  inherit (lib.strings) concatLines optionalString;
 in
 {
   options.polymorph = {
@@ -49,14 +49,20 @@ in
               default = null;
             };
 
-            settings = mkOption {
+            context = mkOption {
               type = attrsOf anything;
               description = "Values to be provided to the template engine.";
               default = { };
             };
 
+            settings = mkOption {
+              type = attrs;
+              description = "Extra data to be added to morphs.";
+              default = { };
+            };
+
             extraScripts = mkOption {
-              type = coercedTo str (x: [ x ]) (listOf str);
+              type = coercedTo anything (x: [ x ]) (coercedTo (listOf anything) (map toString) (listOf str));
               description = "Extra scripts to execute during morph activation.";
               default = [ ];
             };
@@ -100,38 +106,26 @@ in
     let
       cfg = config.polymorph;
 
-      resolveMorphRecursive =
-        history: x:
-        if x.follows == null then
-          x
-        else
-          let
-            parent =
-              assert assertMsg (cfg.morph ? "${x.follows}") ''Could not follow morph "${x.follows}"'';
-              assert assertMsg (any (
-                y: y == x.follows
-              ) history) ''Recursion detected in morph follow to "${x.follows}"'';
-              cfg.morph.${x.follows};
-          in
-          resolveMorphRecursive (history ++ [ x.follows ]) {
-            follows = parent.follows;
-            settings = recursiveUpdate parent.settings x.settings;
-            extraScripts = parent.extraScripts ++ x.extraScripts;
-          };
-
-      resolveMorph = resolveMorphRecursive [ ];
+      resolveMorph =
+        x:
+        outputs.lib.resolveMorph cfg.morph x (
+          parent: current: {
+            context = recursiveUpdate parent.context current.context;
+            extraScripts = parent.extraScripts ++ current.extraScripts;
+          }
+        );
 
       files = attrNames (filterAttrs (_: v: v.enable) cfg.file);
       morphs = mapAttrs (_: resolveMorph) cfg.morph;
 
-      mkSettings =
+      mkSubstitution =
         n: v:
         pkgs.stdenvNoCC.mkDerivation rec {
           name = "polymorph-${n}";
 
           dontUnpack = true;
 
-          src = pkgs.writeText "${name}.json" (toJSON v.settings);
+          src = pkgs.writeText "${name}.json" (toJSON v.context);
 
           nativeBuildInputs = with pkgs; [
             gomplate
@@ -146,6 +140,7 @@ in
               ''
                 mkdir -p ./$(dirname ${file.target})
                 gomplate -c .=$src -f ${file.source} -o ./${file.target}
+                ${optionalString (file.executable != null && file.executable) "chmod +x ./${file.target}"}
               ''
             ) files
           );
@@ -175,7 +170,7 @@ in
               in
               ''
                 mkdir -p $HOME/$(dirname ${path})
-                cp -f ${mkSettings n v}/${path} $HOME/${path}
+                cp -f ${mkSubstitution n v}/${path} $HOME/${path}
               ''
             ) files)
             ++ v.extraScripts
