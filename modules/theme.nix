@@ -188,7 +188,7 @@ in
                 (
                   optionalAttrs (v.cursorTheme != null) {
                     cursor-size = v.cursorTheme.size;
-                    cursor-theme = v.cursorTheme.size;
+                    cursor-theme = v.cursorTheme.name;
                   }
                   // optionalAttrs (v.font != null) {
                     font-name = "${v.font.name} ${toString v.font.size}";
