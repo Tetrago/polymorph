@@ -19,7 +19,7 @@ let
     types
     ;
   inherit (lib.asserts) assertMsg;
-  inherit (lib.attrsets) filterAttrs mapAttrs;
+  inherit (lib.attrsets) filterAttrs filterAttrsRecursive mapAttrs;
   inherit (lib.strings) concatLines optionalString;
 in
 {
@@ -110,7 +110,7 @@ in
         x:
         outputs.lib.resolveMorph cfg.morph x (
           parent: current: {
-            context = recursiveUpdate parent.context current.context;
+            context = recursiveUpdate parent.context (filterAttrsRecursive (_: v: v != null) current.context);
             extraScripts = parent.extraScripts ++ current.extraScripts;
           }
         );
