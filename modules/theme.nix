@@ -49,6 +49,12 @@ in
     darkman = {
       enable = mkEnableOption "darkman support for polymorph theme module.";
 
+      enableActivationScript = mkOption {
+        type = types.bool;
+        description = "Wether to automatically restart darkman on home activation";
+        default = true;
+      };
+
       dark = mkOption {
         type = types.str;
         apply =
@@ -210,6 +216,17 @@ in
       };
 
       home = {
+        activation.restartDarkman = mkIf (with cfg.darkman; enable && enableActivationScript) (
+          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            if [ -z "''${DRY_RUN:-}" ]; then
+              if ${pkgs.systemd}/bin/systemctl --user is-active --quiet darkman.service; then
+                echo "Restarting darkman...";
+                ${pkgs.systemd}/bin/systemctl --user restart darkman.service
+              fi
+            fi
+          ''
+        );
+
         file =
           {
             ".gtkrc-2.0".text = ''
